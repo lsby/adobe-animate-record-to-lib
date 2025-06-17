@@ -101,6 +101,16 @@ function 生成随机名称(长度 = 8) {
   return 结果;
 }
 
+let 当前录音进程 = null;
+var 当前临时音频文件路径 = null;
+const ffmpegPath = path.join(
+  __dirname,
+  "tools",
+  "ffmpeg-2025-06-16-git-e6fb8f373e-essentials_build",
+  "bin",
+  "ffmpeg.exe"
+);
+
 document.getElementById("getAudioList").onclick = async () => {
   try {
     const devices = await 获得音频设备列表();
@@ -116,17 +126,6 @@ document.getElementById("getAudioList").onclick = async () => {
     alert(`读取输入设备列表失败: ${err}`);
   }
 };
-
-let 当前录音进程 = null;
-var 当前临时音频文件路径 = null;
-const ffmpegPath = path.join(
-  __dirname,
-  "tools",
-  "ffmpeg-2025-06-16-git-e6fb8f373e-essentials_build",
-  "bin",
-  "ffmpeg.exe"
-);
-
 document.getElementById("startBtn").onclick = async () => {
   try {
     当前临时音频文件路径 = path.join(
@@ -176,7 +175,6 @@ document.getElementById("startBtn").onclick = async () => {
     alert(`发生了错误: ${err}`);
   }
 };
-
 document.getElementById("stopBtn").onclick = async () => {
   if (!当前录音进程) {
     alert("没有正在进行的录音");
@@ -196,8 +194,18 @@ document.getElementById("stopBtn").onclick = async () => {
     当前录音进程 = null;
     document.getElementById("recordingIndicator").style.visibility = "hidden";
     console.log("录音结束, ffmpeg退出码:", code);
+    当前临时音频文件路径 = 当前临时音频文件路径.replace(/\\/g, "/");
 
-    await 导入文件到库("file:///" + 当前临时音频文件路径.replace(/\\/g, "/"));
+    const buffer = await fs.promises.readFile(当前临时音频文件路径);
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    渲染示波器(blob);
+  } catch (err) {
+    alert("发生了错误: " + err.message);
+  }
+};
+document.getElementById("toLibBut").onclick = async () => {
+  try {
+    await 导入文件到库("file:///" + 当前临时音频文件路径);
     console.log("导入成功!");
 
     await fs.promises.unlink(当前临时音频文件路径);
@@ -207,3 +215,36 @@ document.getElementById("stopBtn").onclick = async () => {
     alert("发生了错误: " + err.message);
   }
 };
+
+let wavesurfer;
+function 渲染示波器(blob) {
+  if (wavesurfer) {
+    wavesurfer.destroy();
+  }
+  wavesurfer = WaveSurfer.create({
+    container: "#waveform",
+    waveColor: "#007bff",
+    progressColor: "#0056b3",
+    height: 128,
+    responsive: true,
+  });
+
+  const audioURL = URL.createObjectURL(blob);
+  wavesurfer.load(audioURL);
+  wavesurfer.on("click", () => {
+    wavesurfer.play();
+  });
+
+  window.addEventListener("keydown", function (event) {
+    // 避免在输入框中按空格也触发播放
+    const isInput = ["INPUT", "TEXTAREA"].includes(
+      document.activeElement.tagName
+    );
+    if (event.code === "Space" && !isInput) {
+      event.preventDefault(); // 阻止页面滚动
+      if (wavesurfer) {
+        wavesurfer.playPause();
+      }
+    }
+  });
+}
