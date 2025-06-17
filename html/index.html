@@ -124,20 +124,6 @@
             删除选择的区域
           </button>
           <button
-            id="autoCutBtn"
-            style="
-              padding: 6px 12px;
-              border-radius: 6px;
-              border: none;
-              background: #0a43df;
-              color: white;
-              cursor: pointer;
-              margin-right: 8px;
-            "
-          >
-            一键剪辑无声区域
-          </button>
-          <button
             id="undoBtn"
             style="
               padding: 6px 12px;
@@ -152,14 +138,81 @@
             撤销
           </button>
 
-          <label style="margin-left: 8px; font-size: 14px">
-            <input
-              type="checkbox"
-              id="autoCutCheckbox"
-              style="margin-right: 4px"
-            />
-            自动剪辑无声区域
-          </label>
+          <div
+            id="autoCutSettings"
+            style="
+              margin-top: 16px;
+              padding: 16px;
+              border: 1px solid #ccc;
+              border-radius: 8px;
+              background: #f1f3f5;
+              font-size: 14px;
+            "
+          >
+            <label style="display: block; margin-bottom: 6px">
+              阈值百分比：
+              <input
+                type="number"
+                id="thresholdPercent"
+                value="25"
+                min="0"
+                max="100"
+                step="1"
+                style="margin-left: 6px; width: 60px"
+              />
+              %
+            </label>
+
+            <label style="display: block; margin-bottom: 6px">
+              最小持续时间（秒）：
+              <input
+                type="number"
+                id="minSilenceDuration"
+                value="0.5"
+                min="0"
+                step="0.1"
+                style="margin-left: 6px; width: 60px"
+              />
+            </label>
+
+            <label style="display: block; margin-bottom: 12px">
+              缓冲区域（秒）：
+              <input
+                type="number"
+                id="paddingDuration"
+                value="0.1"
+                min="0"
+                step="0.1"
+                style="margin-left: 6px; width: 60px"
+              />
+            </label>
+
+            <label
+              style="display: block; margin-bottom: 10px; font-weight: bold"
+            >
+              <input
+                type="checkbox"
+                id="autoCutCheckbox"
+                style="margin-right: 6px"
+              />
+              启用自动剪辑无声区域
+            </label>
+
+            <button
+              id="autoCutBtn"
+              style="
+                padding: 6px 12px;
+                border-radius: 6px;
+                border: none;
+                background: #0a43df;
+                color: white;
+                cursor: pointer;
+                margin-top: 4px;
+              "
+            >
+              一键剪辑无声区域
+            </button>
+          </div>
         </div>
 
         <div style="margin-bottom: 24px">

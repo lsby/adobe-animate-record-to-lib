@@ -448,7 +448,17 @@ document.getElementById("autoCutBtn").onclick = async () => {
   保存当前状态();
 
   const audioBuffer = await blob转AudioBuffer(当前音频Blob);
-  const 去静音后 = 去除静音(audioBuffer);
+
+  let 阈值百分比 = document.getElementById("thresholdPercent").value;
+  let 最小持续时间秒 = document.getElementById("minSilenceDuration").value;
+  let 缓冲区域秒 = document.getElementById("paddingDuration").value;
+
+  const 去静音后 = 去除静音(
+    audioBuffer,
+    阈值百分比,
+    最小持续时间秒,
+    缓冲区域秒
+  );
   当前音频Blob = audioBuffer转Blob(去静音后);
   当前音频Buf = Buffer.from(await 当前音频Blob.arrayBuffer());
   渲染示波器();
