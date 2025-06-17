@@ -293,6 +293,28 @@ const ffmpegPath = path.join(
   "bin",
   "ffmpeg.exe"
 );
+const 音频历史栈 = [];
+
+function 保存当前状态() {
+  if (当前音频Blob && 当前音频Buf) {
+    音频历史栈.push({
+      blob: 当前音频Blob,
+      buf: 当前音频Buf,
+    });
+  }
+}
+
+function 撤销操作() {
+  if (音频历史栈.length === 0) {
+    alert("没有可撤销的操作");
+    return;
+  }
+  const 上一次状态 = 音频历史栈.pop();
+  当前音频Blob = 上一次状态.blob;
+  当前音频Buf = 上一次状态.buf;
+
+  渲染示波器();
+}
 
 document.getElementById("getAudioList").onclick = async () => {
   try {
@@ -381,7 +403,7 @@ document.getElementById("stopBtn").onclick = async () => {
     当前音频Buf = Buffer.concat(当前录音数据缓存);
     当前音频Blob = new Blob([当前音频Buf], { type: "audio/wav" });
 
-    渲染示波器(当前音频Blob);
+    渲染示波器();
   } catch (err) {
     alert("发生了错误: " + err.message);
   }
@@ -420,11 +442,16 @@ document.getElementById("autoCutBtn").onclick = async () => {
     return;
   }
 
+  保存当前状态();
+
   const audioBuffer = await blob转AudioBuffer(当前音频Blob);
   const 去静音后 = 去除静音(audioBuffer);
   当前音频Blob = audioBuffer转Blob(去静音后);
   当前音频Buf = Buffer.from(await 当前音频Blob.arrayBuffer());
-  渲染示波器(当前音频Blob);
+  渲染示波器();
+};
+document.getElementById("undoBtn").onclick = () => {
+  撤销操作();
 };
 
 let wavesurfer;
@@ -464,6 +491,8 @@ function 渲染示波器() {
   document.getElementById("delRegions").onclick = async () => {
     if (!当前的区域) return;
 
+    保存当前状态();
+
     var audioBuffer = await blob转AudioBuffer(当前音频Blob);
     var 剪切后的audioBuffer = 剪切AudioBuffer(
       audioBuffer,
@@ -475,7 +504,7 @@ function 渲染示波器() {
 
     当前的区域.remove();
 
-    渲染示波器(当前音频Blob);
+    渲染示波器();
   };
 
   wavesurfer.load(URL.createObjectURL(当前音频Blob));
