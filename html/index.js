@@ -404,6 +404,9 @@ document.getElementById("stopBtn").onclick = async () => {
     当前音频Blob = new Blob([当前音频Buf], { type: "audio/wav" });
 
     渲染示波器();
+
+    var 自动剪辑开关 = document.getElementById("autoCutCheckbox").checked;
+    if (自动剪辑开关) document.getElementById("autoCutBtn").click();
   } catch (err) {
     alert("发生了错误: " + err.message);
   }
