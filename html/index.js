@@ -102,7 +102,7 @@ function 生成随机名称(长度 = 8) {
 }
 
 let 当前录音进程 = null;
-var 当前临时音频文件路径 = null;
+var 当前音频Blob = null;
 const ffmpegPath = path.join(
   __dirname,
   "tools",
@@ -123,36 +123,34 @@ document.getElementById("getAudioList").onclick = async () => {
       select.appendChild(option);
     });
   } catch (err) {
-    alert(`读取输入设备列表失败: ${err}`);
+    alert(`发生了错误: ${err}`);
   }
 };
 document.getElementById("startBtn").onclick = async () => {
   try {
-    当前临时音频文件路径 = path.join(
-      path.dirname(await 获得当前fla文件路径()),
-      Date.now().toString() + "_" + 生成随机名称() + ".wav"
-    );
-
-    const 音频输入文件名称 = document.getElementById("audioDeviceSelect").value;
-    if (!音频输入文件名称) return alert("无效的音频设备");
+    const 音频输入设备 = document.getElementById("audioDeviceSelect").value;
+    if (!音频输入设备) return alert("无效的音频输入设备");
 
     if (当前录音进程) {
       alert("录音已在进行中!");
       return;
     }
 
+    当前录音数据缓存 = [];
     const ffmpegArgs = [
       "-f",
       "dshow",
       "-i",
-      `audio=${音频输入文件名称}`,
+      `audio=${音频输入设备}`,
       "-acodec",
       "pcm_s16le",
       "-ar",
       "44100",
       "-ac",
       "2",
-      当前临时音频文件路径,
+      "-f",
+      "wav",
+      "pipe:1",
     ];
 
     // alert("点击确认后开始录音");
@@ -161,6 +159,10 @@ document.getElementById("startBtn").onclick = async () => {
       stdio: ["pipe", "pipe", "pipe"],
     });
     document.getElementById("recordingIndicator").style.visibility = "visible";
+
+    当前录音进程.stdout.on("data", (chunk) => {
+      当前录音数据缓存.push(chunk);
+    });
 
     当前录音进程.stderr.on("data", (data) => {
       console.log(`ffmpeg: ${data.toString()}`);
@@ -185,34 +187,50 @@ document.getElementById("stopBtn").onclick = async () => {
     当前录音进程.stdin.write("q");
     当前录音进程.stdin.end();
 
-    var code = await new Promise((res, rej) => {
-      当前录音进程.on("close", async (code) => {
-        res(code);
-      });
+    var code = await new Promise((res) => {
+      当前录音进程.on("close", res);
     });
 
     当前录音进程 = null;
     document.getElementById("recordingIndicator").style.visibility = "hidden";
     console.log("录音结束, ffmpeg退出码:", code);
-    当前临时音频文件路径 = 当前临时音频文件路径.replace(/\\/g, "/");
 
-    const buffer = await fs.promises.readFile(当前临时音频文件路径);
-    const blob = new Blob([buffer], { type: "audio/wav" });
-    渲染示波器(blob);
+    const buffer = Buffer.concat(当前录音数据缓存);
+    当前音频Blob = new Blob([buffer], { type: "audio/wav" });
+
+    渲染示波器(当前音频Blob);
   } catch (err) {
     alert("发生了错误: " + err.message);
   }
 };
 document.getElementById("toLibBut").onclick = async () => {
-  try {
-    await 导入文件到库("file:///" + 当前临时音频文件路径);
-    console.log("导入成功!");
+  if (!当前音频Blob) {
+    alert("没有可导入的录音");
+    return;
+  }
 
-    await fs.promises.unlink(当前临时音频文件路径);
-    当前临时音频文件路径 = null;
-    console.log("临时文件删除成功!");
+  let 临时文件路径 = "";
+  try {
+    const 当前fla路径 = await 获得当前fla文件路径();
+    临时文件路径 = path
+      .join(
+        path.dirname(当前fla路径),
+        Date.now().toString() + "_" + 生成随机名称() + ".wav"
+      )
+      .replace(/\\/g, "/");
+
+    const buffer = Buffer.from(await 当前音频Blob.arrayBuffer());
+    await fs.promises.writeFile(临时文件路径, buffer);
+
+    await 导入文件到库("file:///" + 临时文件路径);
+    console.log("导入成功!");
   } catch (err) {
     alert("发生了错误: " + err.message);
+  } finally {
+    try {
+      await fs.promises.unlink(临时文件路径);
+      console.log("临时文件删除成功!");
+    } catch {}
   }
 };
 
@@ -231,10 +249,9 @@ function 渲染示波器(blob) {
 
   const audioURL = URL.createObjectURL(blob);
   wavesurfer.load(audioURL);
-  wavesurfer.on("click", () => {
-    wavesurfer.play();
-  });
-
+  // wavesurfer.on("click", () => {
+  //   wavesurfer.play();
+  // });
   window.addEventListener("keydown", function (event) {
     // 避免在输入框中按空格也触发播放
     const isInput = ["INPUT", "TEXTAREA"].includes(
