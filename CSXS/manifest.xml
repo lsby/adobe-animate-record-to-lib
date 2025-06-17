@@ -31,17 +31,9 @@
                     <Menu>record to lib</Menu>
                     <Geometry>
                         <Size>
-                            <Height>580</Height>
-                            <Width>1020</Width>
-                        </Size>
-                        <MaxSize>
-                            <Height>800</Height>
-                            <Width>1200</Width>
-                        </MaxSize>
-                        <MinSize>
-                            <Height>400</Height>
+                            <Height>600</Height>
                             <Width>600</Width>
-                        </MinSize>
+                        </Size>
                     </Geometry>
                     <NodeIntegration>true</NodeIntegration>
                 </UI>
