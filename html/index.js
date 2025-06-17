@@ -100,8 +100,105 @@ function 生成随机名称(长度 = 8) {
   }
   return 结果;
 }
+function blob转AudioBuffer(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const arrayBuffer = reader.result;
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        resolve(audioBuffer);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(blob);
+  });
+}
+function 剪切AudioBuffer(buffer, startSec, endSec) {
+  const sampleRate = buffer.sampleRate;
+  const numChannels = buffer.numberOfChannels;
+
+  const startOffset = Math.floor(startSec * sampleRate);
+  const endOffset = Math.floor(endSec * sampleRate);
+
+  const cutLength = buffer.length - (endOffset - startOffset);
+  const newBuffer = new AudioBuffer({
+    length: cutLength,
+    sampleRate,
+    numberOfChannels: numChannels,
+  });
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const oldData = buffer.getChannelData(channel);
+    const newData = newBuffer.getChannelData(channel);
+
+    newData.set(oldData.subarray(0, startOffset));
+    newData.set(oldData.subarray(endOffset), startOffset);
+  }
+
+  return newBuffer;
+}
+function audioBuffer转Blob(audioBuffer) {
+  const numChannels = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const format = 1; // PCM
+  const bitDepth = 16;
+
+  const samples = audioBuffer.length;
+  const blockAlign = (bitDepth / 8) * numChannels;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  let offset = 0;
+  function writeString(s) {
+    for (let i = 0; i < s.length; i++) {
+      view.setUint8(offset++, s.charCodeAt(i));
+    }
+  }
+
+  writeString("RIFF");
+  view.setUint32(offset, 36 + dataSize, true);
+  offset += 4;
+  writeString("WAVE");
+  writeString("fmt ");
+  view.setUint32(offset, 16, true);
+  offset += 4; // PCM header size
+  view.setUint16(offset, format, true);
+  offset += 2;
+  view.setUint16(offset, numChannels, true);
+  offset += 2;
+  view.setUint32(offset, sampleRate, true);
+  offset += 4;
+  view.setUint32(offset, byteRate, true);
+  offset += 4;
+  view.setUint16(offset, blockAlign, true);
+  offset += 2;
+  view.setUint16(offset, bitDepth, true);
+  offset += 2;
+  writeString("data");
+  view.setUint32(offset, dataSize, true);
+  offset += 4;
+
+  for (let i = 0; i < samples; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      let sample = audioBuffer.getChannelData(ch)[i];
+      sample = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
 
 let 当前录音进程 = null;
+var 当前音频Buf = null;
 var 当前音频Blob = null;
 const ffmpegPath = path.join(
   __dirname,
@@ -195,8 +292,8 @@ document.getElementById("stopBtn").onclick = async () => {
     document.getElementById("recordingIndicator").style.visibility = "hidden";
     console.log("录音结束, ffmpeg退出码:", code);
 
-    const buffer = Buffer.concat(当前录音数据缓存);
-    当前音频Blob = new Blob([buffer], { type: "audio/wav" });
+    当前音频Buf = Buffer.concat(当前录音数据缓存);
+    当前音频Blob = new Blob([当前音频Buf], { type: "audio/wav" });
 
     渲染示波器(当前音频Blob);
   } catch (err) {
@@ -219,9 +316,7 @@ document.getElementById("toLibBut").onclick = async () => {
       )
       .replace(/\\/g, "/");
 
-    const buffer = Buffer.from(await 当前音频Blob.arrayBuffer());
-    await fs.promises.writeFile(临时文件路径, buffer);
-
+    await fs.promises.writeFile(临时文件路径, 当前音频Buf);
     await 导入文件到库("file:///" + 临时文件路径);
     console.log("导入成功!");
   } catch (err) {
@@ -235,33 +330,68 @@ document.getElementById("toLibBut").onclick = async () => {
 };
 
 let wavesurfer;
-function 渲染示波器(blob) {
-  if (wavesurfer) {
-    wavesurfer.destroy();
-  }
+let regions;
+function 渲染示波器() {
+  let 当前的区域 = null;
+  let 结束播放位置 = null;
+
+  if (wavesurfer) wavesurfer.destroy();
+  if (regions) regions.destroy();
+
+  regions = WaveSurfer.Regions.create();
   wavesurfer = WaveSurfer.create({
     container: "#waveform",
     waveColor: "#007bff",
     progressColor: "#0056b3",
     height: 128,
     responsive: true,
+    plugins: [regions],
+  });
+  regions.enableDragSelection({
+    color: "rgba(255, 0, 0, 0.1)",
+  });
+  regions.on("region-created", (a) => {
+    if (当前的区域) 当前的区域.remove();
+    当前的区域 = a;
+  });
+  wavesurfer.on("timeupdate", (a) => {
+    if (结束播放位置 !== null && a >= 结束播放位置) wavesurfer.pause();
   });
 
-  const audioURL = URL.createObjectURL(blob);
-  wavesurfer.load(audioURL);
-  // wavesurfer.on("click", () => {
-  //   wavesurfer.play();
-  // });
-  window.addEventListener("keydown", function (event) {
-    // 避免在输入框中按空格也触发播放
-    const isInput = ["INPUT", "TEXTAREA"].includes(
-      document.activeElement.tagName
+  document.getElementById("playRegions").onclick = async () => {
+    if (!当前的区域) return;
+    结束播放位置 = 当前的区域.end;
+    当前的区域.play();
+  };
+  document.getElementById("delRegions").onclick = async () => {
+    if (!当前的区域) return;
+
+    var audioBuffer = await blob转AudioBuffer(当前音频Blob);
+    var 剪切后的audioBuffer = 剪切AudioBuffer(
+      audioBuffer,
+      当前的区域.start,
+      当前的区域.end
     );
-    if (event.code === "Space" && !isInput) {
-      event.preventDefault(); // 阻止页面滚动
-      if (wavesurfer) {
-        wavesurfer.playPause();
-      }
+    当前音频Blob = audioBuffer转Blob(剪切后的audioBuffer);
+    当前音频Buf = Buffer.from(await 当前音频Blob.arrayBuffer());
+
+    当前的区域.remove();
+
+    渲染示波器(当前音频Blob);
+  };
+
+  wavesurfer.load(URL.createObjectURL(当前音频Blob));
+  window.onkeydown = function (event) {
+    event.preventDefault();
+
+    // 避免在输入框中按空格也触发播放
+    if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+
+    // 处理空格事件
+    if (event.code === "Space") {
+      // 阻止页面滚动
+      结束播放位置 = null;
+      wavesurfer.playPause();
     }
-  });
+  };
 }

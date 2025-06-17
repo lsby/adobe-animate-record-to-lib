@@ -94,9 +94,41 @@
       <div style="margin-bottom: 24px">
         <p style="font-weight: bold; margin-bottom: 8px">3. 音频波形预览</p>
         <div id="waveform" style="width: 100%; height: 128px; background: #eee; border-radius: 8px;"></div>
+        <div style="margin-top: 12px;">
+          <button
+            id="playRegions"
+            style="
+              padding: 6px 12px;
+              border-radius: 6px;
+              border: none;
+              background: #17a2b8;
+              color: white;
+              cursor: pointer;
+              margin-right: 8px;
+              transition: background 0.2s ease;
+            "
+          >
+            播放选择的区域
+          </button>
+          <button
+            id="delRegions"
+            style="
+              padding: 6px 12px;
+              border-radius: 6px;
+              border: none;
+              background: #e40707;
+              color: white;
+              cursor: pointer;
+              transition: background 0.2s ease;
+            "
+          >
+            删除选择的区域
+          </button>
+        </div>
       </div>
   </body>
 
-  <script src="../lib/wavesurfer.min.js"></script>
+  <script src="../node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+  <script src="../node_modules/wavesurfer.js/dist/plugins/regions.min.js"></script>
   <script src="./index.js"></script>
 </html>
