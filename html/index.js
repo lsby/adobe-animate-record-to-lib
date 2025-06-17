@@ -34,7 +34,7 @@ async function 导入文件到库(文件路径) {
             doc.importFile("${文件路径}");
             return "导入成功";
           } catch(e) {
-            return "导入失败：" + e.message;
+            return "导入失败: " + e.message;
           }
         })();`,
       function (result) {
@@ -118,7 +118,7 @@ document.getElementById("getAudioList").onclick = async () => {
 };
 
 let 当前录音进程 = null;
-var 当前临时音频文件 = null;
+var 当前临时音频文件路径 = null;
 const ffmpegPath = path.join(
   __dirname,
   "tools",
@@ -129,7 +129,7 @@ const ffmpegPath = path.join(
 
 document.getElementById("startBtn").onclick = async () => {
   try {
-    当前临时音频文件 = path.join(
+    当前临时音频文件路径 = path.join(
       path.dirname(await 获得当前fla文件路径()),
       Date.now().toString() + "_" + 生成随机名称() + ".wav"
     );
@@ -138,7 +138,7 @@ document.getElementById("startBtn").onclick = async () => {
     if (!音频输入文件名称) return alert("无效的音频设备");
 
     if (当前录音进程) {
-      alert("录音已在进行中！");
+      alert("录音已在进行中!");
       return;
     }
 
@@ -153,7 +153,7 @@ document.getElementById("startBtn").onclick = async () => {
       "44100",
       "-ac",
       "2",
-      当前临时音频文件,
+      当前临时音频文件路径,
     ];
 
     alert("点击确认后开始录音");
@@ -163,15 +163,15 @@ document.getElementById("startBtn").onclick = async () => {
     });
 
     当前录音进程.stderr.on("data", (data) => {
-      // console.log(`ffmpeg: ${data.toString()}`);
+      console.log(`ffmpeg: ${data.toString()}`);
     });
 
     当前录音进程.on("error", (err) => {
-      alert("录音启动失败：" + err.message);
+      alert("录音启动失败: " + err.message);
       当前录音进程 = null;
     });
   } catch (err) {
-    alert(`读取输入设备列表失败: ${err}`);
+    alert(`发生了错误: ${err}`);
   }
 };
 
@@ -185,21 +185,22 @@ document.getElementById("stopBtn").onclick = async () => {
     当前录音进程.stdin.write("q");
     当前录音进程.stdin.end();
 
-    当前录音进程.on("close", async (code) => {
-      当前录音进程 = null;
-      console.log("录音结束，ffmpeg退出码：", code);
-
-      try {
-        await 导入文件到库("file:///" + 当前临时音频文件.replace(/\\/g, "/"));
-        console.log("导入成功！");
-        await fs.promises.unlink(当前临时音频文件);
-        console.log("临时文件删除成功！");
-        当前临时音频文件 = null;
-      } catch (err) {
-        alert("导入或删除文件失败：" + err.message);
-      }
+    var code = await new Promise((res, rej) => {
+      当前录音进程.on("close", async (code) => {
+        res(code);
+      });
     });
+
+    当前录音进程 = null;
+    console.log("录音结束, ffmpeg退出码:", code);
+
+    await 导入文件到库("file:///" + 当前临时音频文件路径.replace(/\\/g, "/"));
+    console.log("导入成功!");
+
+    await fs.promises.unlink(当前临时音频文件路径);
+    当前临时音频文件路径 = null;
+    console.log("临时文件删除成功!");
   } catch (err) {
-    alert("停止失败：" + err.message);
+    alert("发生了错误: " + err.message);
   }
 };
