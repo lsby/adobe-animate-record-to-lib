@@ -156,11 +156,12 @@ document.getElementById("startBtn").onclick = async () => {
       当前临时音频文件路径,
     ];
 
-    alert("点击确认后开始录音");
+    // alert("点击确认后开始录音");
 
     当前录音进程 = spawn(ffmpegPath, ffmpegArgs, {
       stdio: ["pipe", "pipe", "pipe"],
     });
+    document.getElementById("recordingIndicator").style.visibility = "visible";
 
     当前录音进程.stderr.on("data", (data) => {
       console.log(`ffmpeg: ${data.toString()}`);
@@ -169,6 +170,7 @@ document.getElementById("startBtn").onclick = async () => {
     当前录音进程.on("error", (err) => {
       alert("录音启动失败: " + err.message);
       当前录音进程 = null;
+      document.getElementById("recordingIndicator").style.visibility = "hidden";
     });
   } catch (err) {
     alert(`发生了错误: ${err}`);
@@ -192,6 +194,7 @@ document.getElementById("stopBtn").onclick = async () => {
     });
 
     当前录音进程 = null;
+    document.getElementById("recordingIndicator").style.visibility = "hidden";
     console.log("录音结束, ffmpeg退出码:", code);
 
     await 导入文件到库("file:///" + 当前临时音频文件路径.replace(/\\/g, "/"));
