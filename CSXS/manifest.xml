@@ -32,7 +32,7 @@
                     <Geometry>
                         <Size>
                             <Height>600</Height>
-                            <Width>600</Width>
+                            <Width>450</Width>
                         </Size>
                     </Geometry>
                     <NodeIntegration>true</NodeIntegration>
