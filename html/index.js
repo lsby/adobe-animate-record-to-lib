@@ -408,7 +408,7 @@ document.getElementById("stopBtn").onclick = async () => {
     var 自动剪辑开关 = document.getElementById("autoCutCheckbox").checked;
     if (自动剪辑开关) document.getElementById("autoCutBtn").click();
   } catch (err) {
-    alert("发生了错误: " + err.message);
+    alert("发生了错误: " + err);
   }
 };
 document.getElementById("toLibBut").onclick = async () => {
@@ -431,7 +431,7 @@ document.getElementById("toLibBut").onclick = async () => {
     await 导入文件到库("file:///" + 临时文件路径);
     console.log("导入成功!");
   } catch (err) {
-    alert("发生了错误: " + err.message);
+    alert("发生了错误: " + err);
   } finally {
     try {
       await fs.promises.unlink(临时文件路径);
