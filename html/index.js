@@ -24,21 +24,80 @@ async function 获得当前fla文件路径() {
   });
   return 当前fla文件路径;
 }
-async function 导入文件到库(文件路径) {
+function 获取Flash帧率() {
+  return new Promise((resolve, reject) => {
+    window.__adobe_cep__.evalScript(
+      `(function() {
+        var doc = fl.getDocumentDOM();
+        if (!doc) return "没有打开文档";
+        return doc.frameRate.toString();
+      })();`,
+      (result) => {
+        if (result.includes("没有打开文档")) {
+          reject(new Error("Flash未打开任何文档"));
+          return;
+        }
+        const fps = Number(result);
+        if (isNaN(fps) || fps <= 0) {
+          reject(new Error("获取帧率失败，结果非法：" + result));
+          return;
+        }
+        resolve(fps);
+      }
+    );
+  });
+}
+async function 获取声音帧数(audioBlob) {
+  var fps = await 获取Flash帧率();
+
+  const arrayBuffer = await audioBlob.arrayBuffer();
+
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+  const durationInSeconds = audioBuffer.duration;
+  const frameCount = Math.ceil(durationInSeconds * fps);
+
+  return frameCount;
+}
+async function 导入文件到库(文件路径, 声音帧数) {
   return await new Promise((res, rej) => {
     window.__adobe_cep__.evalScript(
       `(function(){
           var doc = fl.getDocumentDOM();
           if(!doc) return "没有打开文档";
           try {
-            doc.importFile("${文件路径}");
+            var libItem = doc.importFile("${文件路径}");
+
+            var timeline = doc.getTimeline();
+            var layerIndex = timeline.currentLayer;
+            var frameIndex = timeline.currentFrame;
+
+            var frames = timeline.layers[layerIndex].frames;
+            var endIndex = frames.length;
+
+            // 查找下一个关键帧
+            for (var i = frameIndex + 1; i < frames.length; i++) {
+              if (frames[i].keyFrame) {
+                endIndex = i;
+                break;
+              }
+            }
+
+            var 可用长度 = endIndex - frameIndex;
+            var 需要扩展 = ${声音帧数} - 可用长度;
+
+            if (需要扩展 > 0) {
+              timeline.insertFrames(需要扩展);
+            }
+
             return "导入成功";
           } catch(e) {
             return "导入失败: " + e.message;
           }
         })();`,
       function (result) {
-        if (result.includes("导入失败")) {
+        if (result !== "导入成功") {
           rej(result);
           return;
         }
@@ -427,8 +486,9 @@ document.getElementById("toLibBut").onclick = async () => {
       )
       .replace(/\\/g, "/");
 
+    var 音频帧数 = await 获取声音帧数(当前音频Blob);
     await fs.promises.writeFile(临时文件路径, 当前音频Buf);
-    await 导入文件到库("file:///" + 临时文件路径);
+    await 导入文件到库("file:///" + 临时文件路径, 音频帧数);
     console.log("导入成功!");
   } catch (err) {
     alert("发生了错误: " + err);
