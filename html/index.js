@@ -60,7 +60,7 @@ async function 获取声音帧数(audioBlob) {
 
   return frameCount;
 }
-async function 导入文件到库(文件路径, 声音帧数) {
+async function 导入文件到库(文件路径, 声音帧数, 延长帧, 延长所有帧) {
   return await new Promise((res, rej) => {
     window.__adobe_cep__.evalScript(
       `(function(){
@@ -69,26 +69,28 @@ async function 导入文件到库(文件路径, 声音帧数) {
           try {
             var libItem = doc.importFile("${文件路径}");
 
-            var timeline = doc.getTimeline();
-            var layerIndex = timeline.currentLayer;
-            var frameIndex = timeline.currentFrame;
+            if(${延长帧}) {
+              var timeline = doc.getTimeline();
+              var layerIndex = timeline.currentLayer;
+              var frameIndex = timeline.currentFrame;
 
-            var frames = timeline.layers[layerIndex].frames;
-            var endIndex = frames.length;
+              var frames = timeline.layers[layerIndex].frames;
+              var endIndex = frames.length;
 
-            // 查找下一个关键帧
-            for (var i = frameIndex + 1; i < frames.length; i++) {
-              if (frames[i].keyFrame) {
-                endIndex = i;
-                break;
+              // 查找下一个关键帧
+              for (var i = frameIndex + 1; i < frames.length; i++) {
+                if (frames[i].keyFrame) {
+                  endIndex = i;
+                  break;
+                }
               }
-            }
 
-            var 可用长度 = endIndex - frameIndex;
-            var 需要扩展 = ${声音帧数} - 可用长度;
+              var 可用长度 = endIndex - frameIndex;
+              var 需要扩展 = ${声音帧数} - 可用长度;
 
-            if (需要扩展 > 0) {
-              timeline.insertFrames(需要扩展);
+              if (需要扩展 > 0) {
+                timeline.insertFrames(需要扩展, ${延长所有帧});
+              }
             }
 
             return "导入成功";
@@ -487,8 +489,10 @@ document.getElementById("toLibBut").onclick = async () => {
       .replace(/\\/g, "/");
 
     var 音频帧数 = await 获取声音帧数(当前音频Blob);
+    var 延长帧 = document.getElementById("autoProlong").checked;
+    var 延长所有帧 = document.getElementById("autoProlongAll").checked;
     await fs.promises.writeFile(临时文件路径, 当前音频Buf);
-    await 导入文件到库("file:///" + 临时文件路径, 音频帧数);
+    await 导入文件到库("file:///" + 临时文件路径, 音频帧数, 延长帧, 延长所有帧);
     console.log("导入成功!");
   } catch (err) {
     alert("发生了错误: " + err);
